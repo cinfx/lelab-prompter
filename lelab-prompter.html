@@ -1,0 +1,1846 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Le Lab Prompter</title>
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lab Prompter">
+<meta name="theme-color" content="#0a0a0a">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=Inter:wght@400;600;700&family=Roboto:wght@400;700&family=Oswald:wght@400;600;700&family=Playfair+Display:wght@400;700&family=Montserrat:wght@400;600;700&family=Courier+Prime:wght@400;700&family=DM+Sans:wght@400;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--border:#2a2a2a;
+  --accent:#00e5a0;--accent-dim:rgba(0,229,160,0.12);--accent-mid:rgba(0,229,160,0.3);
+  --clip-color:#ff6b35;--clip-dim:rgba(255,107,53,0.12);
+  --pdf-color:#6c8fff;--pdf-dim:rgba(108,143,255,0.12);
+  --text:#f0f0f0;--text-muted:#666;--text-mid:#999;
+  --font-display:'Syne',sans-serif;--font-mono:'IBM Plex Mono',monospace;
+  --script-font:'Syne',sans-serif;--script-size:26px;--script-size-fs:38px;
+}
+/* Font picker panel */
+#font-panel{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:400;align-items:center;justify-content:center}
+#font-panel.visible{display:flex}
+#font-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:min(560px,92vw);padding:24px;display:flex;flex-direction:column;gap:18px}
+#font-box h3{font-family:var(--font-mono);font-size:13px;color:var(--accent);letter-spacing:0.06em}
+.font-preview{background:var(--bg);border-radius:8px;padding:20px 24px;text-align:center;color:#ffe033;line-height:1.4;border:1px solid var(--border)}
+.font-section-label{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:8px}
+.font-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.font-opt{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;cursor:pointer;transition:all 0.15s;text-align:center}
+.font-opt:hover{border-color:var(--accent);background:var(--accent-dim)}
+.font-opt.selected{border-color:var(--accent);background:var(--accent-dim)}
+.font-opt .fo-name{font-size:13px;color:var(--text);margin-bottom:4px}
+.font-opt .fo-sample{font-size:11px;color:var(--text-muted)}
+.size-row-font{display:flex;align-items:center;gap:12px}
+.size-row-font label{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);flex-shrink:0;min-width:80px}
+.size-row-font input[type=range]{flex:1;accent-color:var(--accent);height:4px}
+.size-row-font .sz-val{font-family:var(--font-mono);font-size:13px;color:var(--accent);min-width:40px;text-align:right}
+.font-actions{display:flex;gap:10px;justify-content:flex-end}
+.font-apply{font-family:var(--font-mono);font-size:12px;color:#000;background:var(--accent);border:none;border-radius:4px;padding:8px 20px;cursor:pointer;font-weight:700}
+.font-apply:hover{opacity:0.85}
+.font-cancel{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);background:none;border:1px solid var(--border);border-radius:4px;padding:8px 16px;cursor:pointer}
+.font-cancel:hover{color:var(--text)}
+body{background:var(--bg);color:var(--text);font-family:var(--font-display);height:100vh;overflow:hidden;display:grid;grid-template-rows:48px 1fr;grid-template-columns:1fr 380px}
+
+/* TOPBAR */
+#topbar{grid-column:1/-1;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:8px}
+.logo{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;letter-spacing:0.1em;color:var(--accent);text-transform:uppercase;margin-right:auto}
+.logo img{height:26px;width:26px;object-fit:contain;opacity:0.85}
+.top-btn{background:none;border:1px solid var(--border);color:var(--text-mid);font-family:var(--font-mono);font-size:11px;padding:5px 12px;border-radius:4px;cursor:pointer;transition:all 0.15s;white-space:nowrap}
+.top-btn:hover{border-color:var(--accent);color:var(--accent)}
+.top-btn.save{border-color:rgba(0,229,160,0.3);color:var(--accent)}
+.top-btn.save:hover{background:var(--accent-dim)}
+.top-sep{width:1px;height:20px;background:var(--border);flex-shrink:0}
+
+/* PROMPTER */
+#prompter-wrap{position:relative;overflow:hidden;background:var(--bg)}
+#prompter-wrap::before,#prompter-wrap::after{content:'';position:absolute;left:0;right:0;height:120px;z-index:10;pointer-events:none}
+#prompter-wrap::before{top:0;background:linear-gradient(to bottom,var(--bg),transparent)}
+#prompter-wrap::after{bottom:0;background:linear-gradient(to top,var(--bg),transparent)}
+#video-overlay{display:none;position:absolute;inset:0;z-index:50;background:#000;flex-direction:column;align-items:center;justify-content:center}
+#video-overlay.visible{display:flex}
+#video-overlay video{width:100%;height:100%;object-fit:contain;display:block}
+#video-overlay .vo-skip{position:absolute;bottom:20px;right:20px;background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.2);color:#fff;font-family:var(--font-mono);font-size:11px;padding:6px 14px;border-radius:4px;cursor:pointer}
+#video-overlay .vo-skip:hover{background:rgba(255,255,255,0.15)}
+#video-timer{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.7);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:8px 20px;font-family:var(--font-mono);display:flex;flex-direction:column;align-items:center;gap:6px;min-width:160px}
+#video-timer .vt-remaining{font-size:28px;font-weight:700;color:#ffe033;letter-spacing:0.04em}
+#video-timer .vt-label{font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.1em}
+#video-timer .vt-bar-bg{width:140px;height:3px;background:rgba(255,255,255,0.15);border-radius:2px}
+#video-timer .vt-bar-fill{height:100%;background:#ffe033;border-radius:2px;width:100%;transition:width 0.5s linear}
+#focus-line{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:2px;background:linear-gradient(to right,transparent,var(--accent-mid),transparent);z-index:11;pointer-events:none}
+#scroll-content{position:absolute;left:0;right:0;padding:60vh 60px;will-change:transform}
+
+.script-block{padding:18px 0;border-bottom:1px solid #1a1a1a}
+.script-block .line-text{font-size:var(--script-size);line-height:1.55;color:#ffe033;font-weight:600;font-family:var(--script-font)}
+body.fullscreen .script-block .line-text{font-size:var(--script-size-fs)}
+
+/* CLIP MARKERS */
+.clip-marker{display:flex;align-items:center;gap:12px;border-radius:8px;padding:12px 16px;margin:4px 0;cursor:pointer;transition:all 0.2s}
+.clip-marker.type-media{background:var(--clip-dim);border:1px solid rgba(255,107,53,0.25)}
+.clip-marker.type-pdf{background:var(--pdf-dim);border:1px solid rgba(108,143,255,0.25)}
+.clip-marker:hover{filter:brightness(1.15)}
+.clip-marker.is-playing{animation:pulse-clip 1.2s ease infinite}
+.clip-marker.type-media.is-playing{border-color:var(--clip-color)}
+.clip-marker.type-pdf.is-playing{border-color:var(--pdf-color)}
+.clip-marker.no-file{opacity:0.5}
+@keyframes pulse-clip{0%,100%{box-shadow:0 0 0 0 rgba(255,107,53,0.3)}50%{box-shadow:0 0 0 8px rgba(255,107,53,0)}}
+.clip-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.clip-icon.media-icon{background:var(--clip-color)}
+.clip-icon.pdf-icon{background:var(--pdf-color)}
+.clip-icon svg{width:14px;height:14px;fill:white}
+.clip-info{flex:1;min-width:0}
+.clip-name{font-family:var(--font-mono);font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.type-media .clip-name{color:var(--clip-color)}
+.type-pdf .clip-name{color:var(--pdf-color)}
+.clip-sub{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);margin-top:2px}
+.clip-status-txt{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);flex-shrink:0}
+.marker-bottom-row{display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap}
+.mode-toggle{display:flex;gap:4px}
+.mode-btn{font-family:var(--font-mono);font-size:10px;padding:3px 8px;border-radius:3px;border:1px solid var(--border);color:var(--text-muted);cursor:pointer;transition:all 0.15s;user-select:none}
+.mode-btn.active[data-mode="ON"]{background:#1a3a2a;border-color:#00e5a0;color:#00e5a0}
+.mode-btn.active[data-mode="OFF"]{background:#2a1a0a;border-color:#ff9500;color:#ff9500}
+.mode-btn:not(.active):hover{border-color:#555;color:#ccc}
+.cue-info{font-family:var(--font-mono);font-size:10px;color:#888;border:1px solid var(--border);border-radius:3px;padding:3px 8px;cursor:pointer;transition:all 0.15s;user-select:none}
+.cue-info:hover{border-color:#6c8fff;color:#6c8fff}
+
+/* SIDE PANEL */
+#side-panel{background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.panel-section{padding:16px;border-bottom:1px solid var(--border)}
+.panel-label{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:12px}
+
+/* DROP ZONE */
+#drop-zone{border:1.5px dashed var(--border);border-radius:8px;padding:16px;text-align:center;cursor:pointer;transition:all 0.2s;position:relative}
+#drop-zone.drag-over{border-color:var(--clip-color);background:var(--clip-dim)}
+#drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+#drop-zone .dz-icon{font-size:20px;margin-bottom:5px}
+#drop-zone .dz-title{font-family:var(--font-mono);font-size:11px;color:var(--text-mid)}
+#drop-zone .dz-sub{font-family:var(--font-mono);font-size:10px;color:var(--text-muted);margin-top:3px}
+#file-pills{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+.file-pill{background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-family:var(--font-mono);font-size:10px;display:flex;align-items:center;gap:4px}
+.file-pill.media{color:var(--clip-color)}
+.file-pill.pdf{color:var(--pdf-color)}
+.file-pill .fp-ok{color:#00e5a0}
+.file-pill .fp-name{max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* MEDIA PLAYER */
+#media-player{background:var(--surface2);border-radius:8px;overflow:hidden}
+#media-player video,#media-player audio{width:100%;display:block}
+#media-player.has-audio audio{padding:8px}
+#media-player.empty{height:100px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--text-muted);font-family:var(--font-mono);font-size:11px}
+#now-playing{font-family:var(--font-mono);font-size:11px;color:var(--accent);margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:none}
+#now-playing.visible{display:block}
+
+/* CONTROLS */
+.controls-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ctrl-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:12px;padding:10px 8px;border-radius:6px;cursor:pointer;transition:all 0.15s;display:flex;flex-direction:column;align-items:center;gap:4px}
+.ctrl-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+.ctrl-btn.play-btn{grid-column:1/-1;flex-direction:row;justify-content:center;padding:14px;font-size:14px;font-weight:600;border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+.ctrl-btn.play-btn:hover,.ctrl-btn.play-btn.running{background:var(--accent);color:#000}
+.ctrl-btn .icon{font-size:16px}
+.ctrl-btn .label{font-size:10px;color:var(--text-muted)}
+.ctrl-btn:hover .label{color:inherit;opacity:0.7}
+.speed-row{display:flex;align-items:center;gap:12px;margin-top:14px}
+.speed-row label{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);flex-shrink:0}
+.speed-row input[type=range]{flex:1;accent-color:var(--accent);height:4px}
+.speed-val{font-family:var(--font-mono);font-size:13px;color:var(--accent);min-width:28px;text-align:right}
+
+/* CLIP LIST */
+#clip-list-section{flex:1;overflow-y:auto}
+#clip-list-section .panel-label{padding:16px 16px 0}
+#clip-list{list-style:none;padding:8px 16px 16px}
+#clip-list li{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:all 0.15s}
+#clip-list li:hover{border-color:var(--clip-color)}
+#clip-list li.active{border-color:var(--clip-color);background:var(--clip-dim)}
+#clip-list li.pdf-item:hover,#clip-list li.pdf-item.active{border-color:var(--pdf-color);background:var(--pdf-dim)}
+#clip-list li.missing{opacity:0.4}
+#clip-list .clip-dot{width:8px;height:8px;border-radius:50%;background:var(--clip-color);flex-shrink:0}
+#clip-list li.pdf-item .clip-dot{background:var(--pdf-color)}
+#clip-list li.missing .clip-dot{background:var(--text-muted)}
+#clip-list .clip-n{font-family:var(--font-mono);font-size:11px;color:var(--text-muted)}
+#clip-list .clip-ln{font-family:var(--font-mono);font-size:12px;color:var(--text);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#clip-list .clip-ok{font-family:var(--font-mono);font-size:10px}
+#clip-list .clip-ok.yes{color:#00e5a0}
+#clip-list .clip-ok.no{color:var(--text-muted)}
+#clip-list .clip-play-btn{background:none;border:none;color:var(--clip-color);cursor:pointer;font-size:14px;padding:2px 4px}
+#clip-list li.missing .clip-play-btn{pointer-events:none;opacity:0.3}
+
+/* PROGRESS */
+#progress-bar-bg{height:3px;background:var(--border);border-radius:2px}
+#progress-bar-fill{height:100%;background:var(--accent);border-radius:2px;width:0%;transition:width 0.5s}
+#progress-label{font-family:var(--font-mono);font-size:10px;color:var(--text-muted);margin-top:6px;display:flex;justify-content:space-between}
+
+/* PiP */
+#pip-overlay{display:none;position:fixed;bottom:24px;right:24px;z-index:300;width:min(520px,30vw);background:#000;border-radius:10px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.7),0 0 0 1px rgba(255,255,255,0.08)}
+#pip-overlay.visible{display:block}
+#pip-overlay video{width:100%;display:block}
+#pip-overlay audio{width:100%;display:block;padding:8px}
+#pip-overlay .pip-bar{display:flex;align-items:center;gap:6px;padding:5px 10px;background:rgba(0,0,0,0.8)}
+#pip-overlay .pip-name{font-family:var(--font-mono);font-size:9px;color:rgba(255,255,255,0.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+#pip-overlay .pip-close{font-family:var(--font-mono);font-size:11px;color:rgba(255,255,255,0.3);cursor:pointer;flex-shrink:0;line-height:1}
+#pip-overlay .pip-close:hover{color:#fff}
+
+/* PDF OVERLAY */
+#pdf-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:200;flex-direction:column}
+#pdf-overlay.visible{display:flex}
+#pdf-toolbar{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:12px}
+#pdf-toolbar .pdf-title{font-family:var(--font-mono);font-size:12px;color:var(--pdf-color);flex:1}
+#pdf-toolbar button{background:none;border:1px solid var(--border);color:var(--text-mid);font-family:var(--font-mono);font-size:11px;padding:5px 14px;border-radius:4px;cursor:pointer}
+#pdf-toolbar button:hover{border-color:var(--pdf-color);color:var(--pdf-color)}
+#pdf-frame-wrap{flex:1;overflow:auto;display:flex;justify-content:center;padding:20px}
+#pdf-frame-wrap iframe{width:100%;max-width:900px;border:none;border-radius:8px;background:#fff}
+
+/* CUE EDITOR */
+#cue-editor{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:500;align-items:center;justify-content:center}
+#cue-editor.visible{display:flex}
+#cue-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:min(700px,94vw);padding:24px;display:flex;flex-direction:column;gap:14px;max-height:95vh;overflow-y:auto}
+#cue-box h3{font-family:var(--font-mono);font-size:13px;color:var(--pdf-color);letter-spacing:0.05em}
+#cue-video-wrap{background:#000;border-radius:8px;overflow:hidden;position:relative;min-height:60px}
+#cue-video-wrap video,#cue-video-wrap audio{width:100%;display:block;max-height:240px;object-fit:contain}
+#cue-timecode{position:absolute;top:8px;right:12px;font-family:var(--font-mono);font-size:12px;color:#fff;background:rgba(0,0,0,0.6);padding:3px 8px;border-radius:4px;pointer-events:none}
+#cue-timeline-wrap{position:relative;height:48px;background:var(--surface2);border-radius:6px;overflow:hidden;cursor:pointer;user-select:none}
+#cue-waveform-bar{position:absolute;inset:0;background:repeating-linear-gradient(90deg,#2a2a2a 0,#2a2a2a 1px,transparent 1px,transparent 8px)}
+#cue-range-fill{position:absolute;top:0;bottom:0;background:rgba(108,143,255,0.25);border-left:2px solid #6c8fff;border-right:2px solid #ff6b35}
+#cue-playhead{position:absolute;top:0;bottom:0;width:2px;background:#ffe033;pointer-events:none}
+#cue-handle-in{position:absolute;top:0;bottom:0;width:12px;background:#6c8fff;cursor:ew-resize;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff}
+#cue-handle-out{position:absolute;top:0;bottom:0;width:12px;background:#ff6b35;cursor:ew-resize;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff}
+.cue-transport{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.cue-tbtn{font-family:var(--font-mono);font-size:13px;background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);border-radius:6px;padding:7px 11px;cursor:pointer;transition:all 0.15s;line-height:1}
+.cue-tbtn:hover{color:var(--text);border-color:#555;background:#222}
+.cue-tbtn.play{color:var(--accent);border-color:rgba(0,229,160,0.3)}
+.cue-tbtn.play:hover{background:var(--accent-dim)}
+.cue-tbtn.stop{color:#ff4444;border-color:rgba(255,68,68,0.3)}
+.cue-tbtn.stop:hover{background:rgba(255,68,68,0.1)}
+.cue-tsep{width:1px;height:24px;background:var(--border);margin:0 2px}
+.cue-inputs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cue-field{display:flex;flex-direction:column;gap:4px}
+.cue-field label{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.08em}
+.cue-field label.in-label{color:#6c8fff}
+.cue-field label.out-label{color:#ff6b35}
+.cue-field input[type=range]{width:100%;accent-color:#6c8fff}
+.out-field input[type=range]{accent-color:#ff6b35}
+.cue-field .cue-val{font-family:var(--font-mono);font-size:13px;color:var(--text)}
+.cue-actions{display:flex;gap:10px;justify-content:flex-end;align-items:center;flex-wrap:wrap}
+.cue-reset{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);background:none;border:1px solid var(--border);border-radius:4px;padding:6px 14px;cursor:pointer}
+.cue-reset:hover{color:var(--text)}
+.cue-apply{font-family:var(--font-mono);font-size:12px;color:#000;background:var(--accent);border:none;border-radius:4px;padding:8px 20px;cursor:pointer;font-weight:700}
+.cue-apply:hover{opacity:0.85}
+
+/* EDITOR */
+#editor-wrap{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.93);z-index:100;padding:32px;flex-direction:column;gap:14px}
+#editor-wrap.visible{display:flex}
+#editor-wrap h2{font-size:16px;font-weight:700;color:var(--accent);font-family:var(--font-mono)}
+#editor-help{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);line-height:1.9}
+#editor-help code.media{color:var(--clip-color);background:rgba(255,107,53,0.12);padding:1px 6px;border-radius:3px}
+#editor-help code.pdf{color:var(--pdf-color);background:rgba(108,143,255,0.12);padding:1px 6px;border-radius:3px}
+#editor-body{flex:1;display:grid;grid-template-columns:1fr 220px;gap:14px;min-height:0}
+#textarea-wrap{position:relative;display:flex;flex-direction:column;min-height:0}
+#script-textarea{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font-mono);font-size:14px;padding:16px;resize:none;line-height:1.7}
+#script-textarea:focus{outline:none;border-color:var(--accent)}
+#script-textarea.drag-active{border-color:var(--clip-color);background:rgba(255,107,53,0.05)}
+#drop-hint{display:none;position:absolute;inset:0;border-radius:8px;background:rgba(255,107,53,0.13);border:2px dashed var(--clip-color);align-items:center;justify-content:center;font-family:var(--font-mono);font-size:16px;color:var(--clip-color);pointer-events:none;font-weight:600}
+#drop-hint.visible{display:flex}
+#editor-media-panel{background:var(--surface);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;overflow:hidden}
+#editor-media-panel .emp-header{padding:12px 14px 8px;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);border-bottom:1px solid var(--border);flex-shrink:0}
+#editor-media-panel .emp-sub{padding:8px 14px;font-family:var(--font-mono);font-size:10px;color:var(--text-muted);border-bottom:1px solid var(--border);flex-shrink:0;line-height:1.6}
+#editor-file-list{flex:1;overflow-y:auto;padding:8px}
+#editor-file-list .ef-empty{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);text-align:center;padding:24px 10px;line-height:1.8}
+.ef-item{display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);margin-bottom:6px;cursor:grab;transition:all 0.15s;user-select:none;flex-wrap:wrap}
+.ef-item:hover{border-color:var(--clip-color);background:var(--clip-dim)}
+.ef-item.pdf-file:hover{border-color:var(--pdf-color);background:var(--pdf-dim)}
+.ef-item:active{cursor:grabbing;opacity:0.7}
+.ef-item .ef-icon{font-size:15px;flex-shrink:0}
+.ef-item .ef-name{font-family:var(--font-mono);font-size:11px;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ef-item .ef-drag{font-size:12px;color:var(--text-muted);flex-shrink:0}
+.ef-item .ef-del{font-size:11px;color:var(--text-muted);background:none;border:none;cursor:pointer;padding:0 2px;line-height:1;flex-shrink:0}
+.ef-item .ef-del:hover{color:#ff4444}
+.ef-item.drag-over-top{border-top:2px solid var(--accent) !important}
+.ef-item.drag-over-bottom{border-bottom:2px solid var(--accent) !important}
+.ef-mode-row{display:flex;gap:4px;width:100%;padding-top:4px}
+.ef-mode-btn{font-family:var(--font-mono);font-size:9px;padding:2px 7px;border-radius:3px;border:1px solid var(--border);color:var(--text-muted);cursor:pointer;transition:all 0.15s;user-select:none;background:none}
+.ef-mode-btn.active[data-mode="ON"]{background:#1a3a2a;border-color:#00e5a0;color:#00e5a0}
+.ef-mode-btn.active[data-mode="OFF"]{background:#2a1a0a;border-color:#ff9500;color:#ff9500}
+.ef-mode-btn:not(.active):hover{border-color:#555;color:#ccc}
+.editor-actions{display:flex;gap:12px}
+.ed-btn{padding:10px 24px;border-radius:6px;font-family:var(--font-mono);font-size:13px;cursor:pointer;border:1px solid var(--border);transition:all 0.15s}
+.ed-btn.primary{background:var(--accent);color:#000;border-color:var(--accent);font-weight:600}
+.ed-btn.primary:hover{opacity:0.85}
+.ed-btn.secondary{background:none;color:var(--text-muted)}
+.ed-btn.secondary:hover{color:var(--text)}
+
+/* TOAST */
+#toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 20px;font-family:var(--font-mono);font-size:12px;color:var(--accent);opacity:0;transition:opacity 0.3s;pointer-events:none;z-index:999;white-space:nowrap}
+#toast.show{opacity:1}
+
+body.fullscreen #side-panel{display:none}
+body.fullscreen{grid-template-columns:1fr}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div class="logo"><img src="data:image/png;base64,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" alt=""><span>Le Lab Prompter</span></div>
+  <label style="display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:4px 12px;font-family:var(--font-mono);font-size:11px;color:var(--text-muted);cursor:pointer;position:relative;">
+    <div id="badge-dot" style="width:7px;height:7px;border-radius:50%;background:var(--border);flex-shrink:0;"></div>
+    <span id="file-badge-label">Charger les médias</span>
+    <input type="file" multiple accept="video/mp4,video/quicktime,.mov,.mp4,.wav,.mp3,audio/wav,audio/mpeg,application/pdf,.pdf" onchange="handleFileInput(this.files)" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;">
+  </label>
+  <div class="top-sep"></div>
+  <button class="top-btn" onclick="openFontPanel()">🔤 Police</button>
+  <button class="top-btn" onclick="openEditor()">✏ Script</button>
+  <button class="top-btn save" onclick="saveAs()">💾 Save As</button>
+  <button class="top-btn save" id="quick-save-btn" onclick="quickSave()" style="display:none;">💾 Save</button>
+  <button class="top-btn" onclick="openProject()">📂 Ouvrir projet</button>
+  <button class="top-btn" id="fullscreen-btn" onclick="toggleFullscreen()">⛶ Plein écran</button>
+</div>
+
+<div id="prompter-wrap">
+  <div id="focus-line"></div>
+  <div id="scroll-content"></div>
+  <div id="video-overlay">
+    <video id="overlay-video" controls></video>
+    <div id="video-timer">
+      <div class="vt-remaining" id="vt-remaining">—</div>
+      <div class="vt-bar-bg"><div class="vt-bar-fill" id="vt-bar-fill"></div></div>
+      <div class="vt-label">temps restant</div>
+    </div>
+    <button class="vo-skip" onclick="skipVideo()">Passer ⏭</button>
+  </div>
+</div>
+
+<div id="side-panel">
+  <div class="panel-section">
+    <div class="panel-label">Médias — glisse ici ou clique</div>
+    <div id="drop-zone">
+      <input type="file" multiple accept="video/mp4,video/quicktime,.mov,.mp4,.wav,.mp3,audio/wav,audio/mpeg,application/pdf,.pdf" onchange="handleFileInput(this.files)">
+      <div class="dz-icon">⬇</div>
+      <div class="dz-title">Glisse tes fichiers ici</div>
+      <div class="dz-sub">MP4 · MOV · WAV · MP3 · PDF</div>
+    </div>
+    <div id="file-pills"></div>
+  </div>
+  <div class="panel-section">
+    <div class="panel-label">Lecture</div>
+    <div class="controls-grid">
+      <button class="ctrl-btn play-btn" id="play-btn" onclick="togglePlay()">
+        <span id="play-icon">▶</span>&nbsp;<span id="play-label">Démarrer</span>
+      </button>
+      <button class="ctrl-btn" style="grid-column:1/-1;" onclick="returnToStart()"><span class="icon">⏮</span><span class="label">Retour au début</span></button>
+      <button class="ctrl-btn" onclick="scrollStep(-1)"><span class="icon">↑</span><span class="label">Reculer</span></button>
+      <button class="ctrl-btn" onclick="scrollStep(1)"><span class="icon">↓</span><span class="label">Avancer</span></button>
+      <button class="ctrl-btn" onclick="jumpPrevClip()"><span class="icon">⏮</span><span class="label">Clip préc.</span></button>
+      <button class="ctrl-btn" onclick="jumpNextClip()"><span class="icon">⏭</span><span class="label">Clip suiv.</span></button>
+    </div>
+    <div class="speed-row">
+      <label>Vitesse</label>
+      <input type="range" min="0.2" max="3" step="0.1" value="1" id="speed-slider" oninput="setSpeed(this.value)">
+      <span class="speed-val" id="speed-display">1.0×</span>
+    </div>
+  </div>
+  <div class="panel-section">
+    <div class="panel-label">En cours</div>
+    <div id="media-player" class="empty">
+      <svg viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+      <span>Aucun média actif</span>
+    </div>
+    <div id="now-playing"></div>
+  </div>
+  <div class="panel-section">
+    <div class="panel-label">Progression</div>
+    <div id="progress-bar-bg"><div id="progress-bar-fill"></div></div>
+    <div id="progress-label"><span id="prog-cur">0%</span><span id="prog-blocks">0 / 0 blocs</span></div>
+  </div>
+  <div id="clip-list-section">
+    <div class="panel-label">Médias dans le script</div>
+    <ul id="clip-list"></ul>
+  </div>
+</div>
+
+<!-- PiP -->
+<div id="pip-overlay">
+  <div id="pip-video-wrap"></div>
+  <div class="pip-bar">
+    <span class="pip-name" id="pip-name">—</span>
+    <span class="pip-close" onclick="closePip()">✕</span>
+  </div>
+</div>
+
+<!-- PDF -->
+<div id="pdf-overlay">
+  <div id="pdf-toolbar">
+    <span class="pdf-title" id="pdf-title">—</span>
+    <button onclick="closePdf(true)">✓ Fermer &amp; continuer</button>
+    <button onclick="closePdf(false)">✕ Fermer sans continuer</button>
+  </div>
+  <div id="pdf-frame-wrap"><iframe id="pdf-frame" src=""></iframe></div>
+</div>
+
+<!-- CUE EDITOR -->
+<div id="cue-editor">
+  <div id="cue-box">
+    <h3>✂ ÉDITEUR DE CUE — <span id="cue-title"></span></h3>
+    <div id="cue-video-wrap"><div id="cue-timecode">0:00.0</div></div>
+    <div id="cue-timeline-wrap">
+      <div id="cue-waveform-bar"></div>
+      <div id="cue-range-fill"></div>
+      <div id="cue-playhead"></div>
+      <div id="cue-handle-in">◀</div>
+      <div id="cue-handle-out">▶</div>
+    </div>
+    <div class="cue-inputs">
+      <div class="cue-field">
+        <label class="in-label">⬛ IN — point d'entrée</label>
+        <input type="range" id="cue-in-slider" min="0" max="100" step="0.01" value="0">
+        <span class="cue-val" id="cue-in-val">0.0s</span>
+      </div>
+      <div class="cue-field out-field">
+        <label class="out-label">⬛ OUT — point de sortie</label>
+        <input type="range" id="cue-out-slider" min="0" max="100" step="0.01" value="100">
+        <span class="cue-val" id="cue-out-val">fin</span>
+      </div>
+    </div>
+    <div class="cue-transport">
+      <button class="cue-tbtn" onclick="cueGoStart()" title="Aller au début">⏮</button>
+      <button class="cue-tbtn" onclick="cueFrameBack()" title="Reculer 1 frame">◀▌</button>
+      <button class="cue-tbtn play" id="cue-play-btn" onclick="cueTogglePlay()">▶</button>
+      <button class="cue-tbtn stop" onclick="cueStop()" title="Stop">■</button>
+      <button class="cue-tbtn" onclick="cueFrameForward()" title="Avancer 1 frame">▐▶</button>
+      <button class="cue-tbtn" onclick="cueGoEnd()" title="Aller à la fin">⏭</button>
+      <div class="cue-tsep"></div>
+      <button class="cue-tbtn" onclick="cuePreviewIn()">▶ IN</button>
+      <button class="cue-tbtn" onclick="cuePreviewOut()">▶ OUT</button>
+      <button class="cue-tbtn" onclick="cuePreviewFull()">▶ Complet</button>
+    </div>
+    <div class="cue-actions">
+      <button class="cue-reset" onclick="cueReset()">↺ Réinitialiser</button>
+      <button class="cue-apply" onclick="cueApply()">✓ Appliquer</button>
+      <button class="cue-reset" onclick="closeCueEditor()">✕ Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- FONT PANEL -->
+<div id="font-panel">
+  <div id="font-box">
+    <h3>🔤 POLICE DU PROMPTEUR</h3>
+    <div class="font-preview" id="font-preview">Le Lab Prompter — Votre texte ici</div>
+    <div>
+      <div class="font-section-label">Famille de police</div>
+      <div class="font-grid" id="font-grid"></div>
+    </div>
+    <div>
+      <div class="font-section-label">Taille — mode normal</div>
+      <div class="size-row-font">
+        <label>Taille</label>
+        <input type="range" id="font-size-slider" min="16" max="72" step="1" value="26" oninput="previewFontSize(this.value)">
+        <span class="sz-val" id="font-size-val">26px</span>
+      </div>
+    </div>
+    <div>
+      <div class="font-section-label">Taille — plein écran</div>
+      <div class="size-row-font">
+        <label>Taille</label>
+        <input type="range" id="font-size-fs-slider" min="24" max="96" step="1" value="38" oninput="previewFontSizeFs(this.value)">
+        <span class="sz-val" id="font-size-fs-val">38px</span>
+      </div>
+    </div>
+    <div class="font-actions">
+      <button class="font-cancel" onclick="closeFontPanel()">Annuler</button>
+      <button class="font-apply" onclick="applyFont()">✓ Appliquer</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDITOR -->
+<div id="editor-wrap">
+  <h2>✏ Éditeur de script</h2>
+  <div id="editor-help">
+    Positionne ton curseur dans le texte, puis <strong>glisse un média depuis la liste à droite</strong> pour insérer le marqueur.<br>
+    Vidéo/Audio : <code class="media">[CLIP: fichier.mp4 | ON]</code> &nbsp;·&nbsp; PDF : <code class="pdf">[PDF: doc.pdf]</code>
+  </div>
+  <div id="editor-body">
+    <div id="textarea-wrap">
+      <textarea id="script-textarea" spellcheck="false"></textarea>
+      <div id="drop-hint">⬇ Dépose ici pour insérer</div>
+    </div>
+    <div id="editor-media-panel">
+      <div class="emp-header">Médias du projet</div>
+      <div class="emp-sub">Glisse dans le texte pour insérer</div>
+      <div id="editor-file-list">
+        <div class="ef-empty">Aucun média chargé.</div>
+      </div>
+    </div>
+  </div>
+  <div class="editor-actions">
+    <button class="ed-btn primary" onclick="applyScript()">✓ Appliquer</button>
+    <button class="ed-btn secondary" onclick="closeEditor()">Annuler</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Saved script (populated by Save As) -->
+<script id="saved-script" type="application/json">""</script>
+
+<script>
+'use strict';
+
+// ── HELPERS ────────────────────────────────────────────────
+function isPdf(n)   { return /\.pdf$/i.test(n); }
+function isAudio(n) { return /\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(n); }
+function guessMime(n) {
+  if (/\.mp4$/i.test(n))  return 'video/mp4';
+  if (/\.mov$/i.test(n))  return 'video/quicktime';
+  if (/\.mp3$/i.test(n))  return 'audio/mpeg';
+  if (/\.wav$/i.test(n))  return 'audio/wav';
+  if (/\.pdf$/i.test(n))  return 'application/pdf';
+  return 'application/octet-stream';
+}
+function fmtTC(s) {
+  if (s === null || s === undefined || !isFinite(s)) return '—';
+  const m = Math.floor(s/60), sec = Math.floor(s%60), ds = Math.floor((s%1)*10);
+  return m > 0 ? `${m}:${String(sec).padStart(2,'0')}.${ds}` : `${sec}.${ds}s`;
+}
+function toast(msg, ms=2500) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>el.classList.remove('show'), ms);
+}
+
+// ── FILE REGISTRY ──────────────────────────────────────────
+const fileRegistry = {};   // name → { dataUrl, mimeType }
+const videoPreloadCache = {}; // name → hidden <video>
+
+// videoPreloadCache[name] = { vid: HTMLVideoElement, ready: Promise }
+function preloadVideo(name, entry) {
+  if (isPdf(name) || isAudio(name)) return;
+  if (videoPreloadCache[name]) return;
+
+  const vid = document.createElement('video');
+  vid.preload = 'auto';
+  vid.muted   = true;
+  vid.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;top:-9999px;';
+  vid.src = entry.dataUrl;
+
+  // Promise resolves when browser has enough data to play without stalling
+  const ready = new Promise(resolve => {
+    if (vid.readyState >= 4) { resolve(); return; }
+    vid.addEventListener('canplaythrough', resolve, { once:true });
+    // Fallback: resolve after 8s max so we never block forever
+    setTimeout(resolve, 8000);
+  });
+
+  vid.addEventListener('ended', () => { vid.currentTime = 0; vid.pause(); });
+  document.body.appendChild(vid);
+  vid.load();
+
+  videoPreloadCache[name] = { vid, ready };
+}
+
+function registerFile(name, dataUrl, mimeType) {
+  fileRegistry[name] = { dataUrl, mimeType: mimeType || guessMime(name) };
+  preloadVideo(name, fileRegistry[name]);
+}
+
+// Returns true if the video is fully buffered and ready to play instantly
+function isVideoReady(name) {
+  const c = videoPreloadCache[name];
+  return c && c.vid && c.vid.readyState >= 4;
+}
+
+// Wait for video to be ready, show spinner on the marker meanwhile
+async function waitForVideo(name, idx) {
+  const c = videoPreloadCache[name];
+  if (!c) return;
+  if (c.vid.readyState >= 4) return;
+  const statusEl = document.getElementById(`clip-status-${idx}`);
+  if (statusEl) statusEl.textContent = '⏳ chargement…';
+  await c.ready;
+  if (statusEl) statusEl.textContent = '▶ lecture';
+}
+
+function handleFileInput(fileList) {
+  const files = Array.from(fileList);
+  if (!files.length) return;
+  let done = 0;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      registerFile(file.name, e.target.result, file.type);
+      if (++done === files.length) {
+        refreshFilePills(); refreshClipList(); updateBadge(); refreshEditorMediaPanel();
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function refreshFilePills() {
+  const c = document.getElementById('file-pills');
+  c.innerHTML = '';
+  Object.keys(fileRegistry).forEach(name => {
+    const p = document.createElement('div');
+    p.className = 'file-pill ' + (isPdf(name)?'pdf':'media');
+    p.innerHTML = `<span class="fp-ok">✓</span><span class="fp-name" title="${name}">${name}</span>`;
+    c.appendChild(p);
+  });
+}
+
+function updateBadge() {
+  const n = Object.keys(fileRegistry).length;
+  document.getElementById('file-badge-label').textContent = n>0 ? `${n} fichier${n>1?'s':''} chargé${n>1?'s':''}` : 'Charger les médias';
+  document.getElementById('badge-dot').style.background = n>0 ? 'var(--clip-color)' : 'var(--border)';
+}
+
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e=>{e.preventDefault();dropZone.classList.add('drag-over');});
+dropZone.addEventListener('dragleave', ()=>dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e=>{e.preventDefault();dropZone.classList.remove('drag-over');handleFileInput(e.dataTransfer.files);});
+window.addEventListener('dragover', e=>e.preventDefault());
+window.addEventListener('drop', e=>{
+  if (document.getElementById('editor-wrap').classList.contains('visible')) return;
+  e.preventDefault(); handleFileInput(e.dataTransfer.files);
+});
+
+// ── SAVE AS / OPEN PROJECT ─────────────────────────────────
+// Auto-detect: Chrome/Edge → folder API, Safari/iOS → ZIP
+const hasFolderAPI = !!window.showDirectoryPicker;
+let projectDirHandle = null;
+
+function buildSavedHtml() {
+  const scriptText  = blocks.map(b => serializeBlock(b)).join('\n\n');
+  const escapedJSON = JSON.stringify(scriptText);
+  // Blank ALL hidden preload video src before reading outerHTML
+  // videoPreloadCache entries are { vid, ready } objects
+  const preloadEls = [];
+  Object.values(videoPreloadCache).forEach(entry => {
+    const vid = entry && entry.vid ? entry.vid : null;
+    if (vid && vid.src) { preloadEls.push({ vid, src: vid.src }); vid.src = ''; }
+  });
+  // Also blank the overlay video and pip video if they have dataUrls
+  ['overlay-video'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.src && el.src.startsWith('data:')) { preloadEls.push({ vid: el, src: el.src }); el.src = ''; }
+  });
+
+  const rawHtml = document.documentElement.outerHTML;
+
+  // Restore immediately
+  preloadEls.forEach(({ vid, src }) => { vid.src = src; });
+
+  return '<!DOCTYPE html>\n' + rawHtml.replace(
+    /(<script id="saved-script"[^>]*>)[\s\S]*?(<\/script>)/,
+    `$1${escapedJSON}$2`
+  );
+}
+
+function dataUrlToBytes(dataUrl) {
+  const base64 = dataUrl.split(',')[1];
+  const binary = atob(base64);
+  const bytes  = new Uint8Array(binary.length);
+  for (let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+  return bytes;
+}
+
+// ── CHROME/EDGE — folder-based save ────────────────────────
+async function saveToFolder(dirHandle) {
+  toast('💾 Sauvegarde en cours…', 10000);
+  try {
+    for (const [name, entry] of Object.entries(fileRegistry)) {
+      try {
+        const bytes = dataUrlToBytes(entry.dataUrl);
+        const fh = await dirHandle.getFileHandle(name, {create:true});
+        const w  = await fh.createWritable();
+        await w.write(bytes.buffer); await w.close();
+      } catch(e) { console.warn('Skip:', name, e); }
+    }
+    const htmlStr = buildSavedHtml();
+    const fh = await dirHandle.getFileHandle('lelab-prompter.html', {create:true});
+    const w  = await fh.createWritable();
+    const chunk = 1024*1024;
+    for (let i=0;i<htmlStr.length;i+=chunk) await w.write(htmlStr.slice(i,i+chunk));
+    await w.close();
+    const n = Object.keys(fileRegistry).length;
+    toast(`✅ Sauvegardé dans "${dirHandle.name}" — ${n} fichier${n!==1?'s':''}`);
+  } catch(err) { toast('⚠ '+err.message); console.error(err); }
+}
+
+async function saveAs() {
+  if (hasFolderAPI) {
+    try { projectDirHandle = await window.showDirectoryPicker({mode:'readwrite'}); }
+    catch(e) { return; }
+    document.getElementById('quick-save-btn').style.display='';
+    await saveLastDir(projectDirHandle);
+    await saveToFolder(projectDirHandle);
+  } else {
+    await saveAsZip();
+  }
+}
+
+async function quickSave() {
+  if (hasFolderAPI && projectDirHandle) { await saveToFolder(projectDirHandle); return; }
+  await saveAsZip();
+}
+
+// ── SAFARI/iOS — ZIP-based save ─────────────────────────────
+async function loadJSZip() {
+  if (window.JSZip) return window.JSZip;
+  await new Promise((res,rej) => {
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    s.onload=res; s.onerror=rej;
+    document.head.appendChild(s);
+  });
+  return window.JSZip;
+}
+
+async function saveAsZip() {
+  toast('📦 Création du ZIP…', 15000);
+  try {
+    const JSZip = await loadJSZip();
+    const zip   = new JSZip();
+    // Add media files
+    for (const [name, entry] of Object.entries(fileRegistry)) {
+      zip.file(name, dataUrlToBytes(entry.dataUrl));
+    }
+    // Add HTML
+    zip.file('lelab-prompter.html', buildSavedHtml());
+    // Generate and download
+    const blob = await zip.generateAsync({
+      type:'blob', compression:'STORE', // STORE = no compression, faster for video
+    }, meta => {
+      if (meta.percent % 20 < 1) toast(`📦 ${Math.round(meta.percent)}%…`, 15000);
+    });
+    const url = URL.createObjectURL(blob);
+    const a   = document.createElement('a');
+    a.href=url; a.download='lelab-projet.zip'; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 5000);
+    toast(`✅ ZIP téléchargé — ${Object.keys(fileRegistry).length} fichier${Object.keys(fileRegistry).length!==1?'s':''}`);
+  } catch(err) { toast('⚠ '+err.message); console.error(err); }
+}
+
+// ── SAFARI/iOS — open ZIP ────────────────────────────────────
+function extractScriptFromHtml(htmlText) {
+  try {
+    const doc     = new DOMParser().parseFromString(htmlText, 'text/html');
+    const savedEl = doc.querySelector('#saved-script');
+    if (!savedEl) return null;
+    const parsed = JSON.parse(savedEl.textContent);
+    if (typeof parsed === 'string' && parsed.trim().length > 0) return parsed;
+  } catch(e) {}
+  return null;
+}
+
+function finalizeProjectLoad(scriptText) {
+  // Parse + render ONCE with all files already in fileRegistry
+  if (scriptText) {
+    blocks = parseScript(scriptText);
+  }
+  renderScript();       // single call — files are loaded, markers show ✓
+  applyScrollPos();
+  updateProgress();
+  refreshFilePills(); updateBadge(); refreshClipList(); refreshEditorMediaPanel();
+  const n = Object.keys(fileRegistry).length;
+  toast(`✅ Projet ouvert — ${n} fichier${n!==1?'s':''}`);
+}
+
+async function openZip(file) {
+  toast('📂 Extraction du ZIP…', 15000);
+  try {
+    const JSZip = await loadJSZip();
+    const zip   = await JSZip.loadAsync(file);
+
+    // 1. Load ALL media files first
+    const mediaExts = /\.(mp4|mov|mp3|wav|m4a|pdf)$/i;
+    const entries   = Object.keys(zip.files).filter(n => mediaExts.test(n) && !zip.files[n].dir);
+    for (const name of entries) {
+      const blob = await zip.files[name].async('blob');
+      const mime = guessMime(name);
+      await new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = e => { registerFile(name, e.target.result, mime); resolve(); };
+        reader.readAsDataURL(new File([blob], name, {type:mime}));
+      });
+    }
+
+    // 2. Extract script from saved HTML
+    let scriptText = null;
+    if (zip.files['lelab-prompter.html']) {
+      const htmlText = await zip.files['lelab-prompter.html'].async('string');
+      scriptText = extractScriptFromHtml(htmlText);
+    }
+
+    // 3. Render once with everything ready
+    finalizeProjectLoad(scriptText);
+  } catch(err) { toast('⚠ ' + err.message); console.error(err); }
+}
+
+// ── OPEN PROJECT (auto-detect) ────────────────────────────
+async function openProject() {
+  if (hasFolderAPI) {
+    let dirHandle;
+    try { dirHandle = await window.showDirectoryPicker({mode:'read'}); }
+    catch(e) { return; }
+    projectDirHandle = dirHandle;
+    document.getElementById('quick-save-btn').style.display = '';
+    await saveLastDir(dirHandle);
+    toast('📂 Chargement…', 10000);
+    try {
+      // 1. Load ALL media files first
+      for await (const [name, handle] of dirHandle.entries()) {
+        if (handle.kind !== 'file') continue;
+        if (!/\.(mp4|mov|mp3|wav|m4a|pdf)$/i.test(name)) continue;
+        const file = await handle.getFile();
+        await new Promise(resolve => {
+          const reader = new FileReader();
+          reader.onload = e => { registerFile(name, e.target.result, file.type); resolve(); };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      // 2. Extract script from saved HTML
+      let scriptText = null;
+      try {
+        const htmlHandle = await dirHandle.getFileHandle('lelab-prompter.html');
+        const htmlFile   = await htmlHandle.getFile();
+        scriptText = extractScriptFromHtml(await htmlFile.text());
+      } catch(e) { console.warn('No HTML found in folder:', e); }
+
+      // 3. Render once with everything ready
+      finalizeProjectLoad(scriptText);
+    } catch(err) { toast('⚠ ' + err.message); console.error(err); }
+  } else {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = '.zip';
+    input.onchange = e => { if(e.target.files[0]) openZip(e.target.files[0]); };
+    input.click();
+  }
+}
+
+// ── KEYBOARD ──────────────────────────────────────────────
+document.addEventListener('keydown',e=>{
+  if (document.getElementById('cue-editor').classList.contains('visible')) { if(e.code==='Escape')closeCueEditor(); return; }
+  if (document.getElementById('font-panel').classList.contains('visible')) { if(e.code==='Escape')closeFontPanel(); return; }
+  if (document.getElementById('editor-wrap').classList.contains('visible')) return;
+  if (document.getElementById('pdf-overlay').classList.contains('visible')) {
+    if(e.code==='Enter'||e.code==='Escape')closePdf(e.code==='Enter'); return;
+  }
+  if(e.code==='Space'){e.preventDefault();togglePlay();}
+  if(e.code==='ArrowDown'){e.preventDefault();scrollStep(1);}
+  if(e.code==='ArrowUp'){e.preventDefault();scrollStep(-1);}
+  if(e.code==='ArrowRight'){speed=Math.min(3,parseFloat((speed+0.2).toFixed(1)));document.getElementById('speed-slider').value=speed;setSpeed(speed);}
+  if(e.code==='ArrowLeft'){speed=Math.max(0.2,parseFloat((speed-0.2).toFixed(1)));document.getElementById('speed-slider').value=speed;setSpeed(speed);}
+  if(e.code==='KeyN')jumpNextClip();
+  if(e.code==='KeyP')jumpPrevClip();
+});
+document.getElementById('prompter-wrap').addEventListener('wheel', e => {
+  if (document.getElementById('cue-editor').classList.contains('visible')) return;
+  if (document.getElementById('editor-wrap').classList.contains('visible')) return;
+  e.preventDefault();
+  // Pause auto-scroll while manually wheeling
+  const wasPlaying = playing;
+  if (playing) setPlaying(false);
+  scrollPos = Math.max(0, Math.min(scrollPos + e.deltaY, getMaxScroll()));
+  applyScrollPos();
+  // Resume after 1.5s of no wheel activity
+  clearTimeout(document.getElementById('prompter-wrap')._wheelTimer);
+  if (wasPlaying) {
+    document.getElementById('prompter-wrap')._wheelTimer = setTimeout(()=>{
+      setPlaying(true);
+    }, 1500);
+  }
+}, { passive: false });
+
+// Browser capability setup — runs immediately
+if (!hasFolderAPI) {
+  document.getElementById('quick-save-btn').style.display='';
+  document.getElementById('quick-save-btn').textContent='📦 Save ZIP';
+}
+refreshFilePills(); updateBadge();
+
+// ── SCRIPT PARSING
+// Load saved script on startup
+(function() {
+  try {
+    const el = document.getElementById('saved-script');
+    if (!el) return;
+    const txt = JSON.parse(el.textContent);
+    if (txt && txt.trim()) window._savedScript = txt;
+  } catch(e) {}
+})();
+
+const DEFAULT_SCRIPT = `Bienvenue dans l'émission ! Ravi de t'avoir ici.
+
+Merci, c'est un plaisir d'être là.
+
+Raconte-nous ton parcours. Comment tout a commencé ?
+
+[CLIP: intro_parcours.mp4 | ON]
+
+Ce moment charnière dont tu parles, quand s'est-il produit ?
+
+C'était en 2019. J'avais tout misé sur ce projet.
+
+[CLIP: extrait_interview.mp4 | OFF]
+
+Et voici quelques documents de référence.
+
+[PDF: document_reference.pdf]
+
+Tu as un message pour les gens qui traversent quelque chose de similaire ?
+
+[CLIP: message_inspiration.mp3 | ON]
+
+Magnifique. Merci infiniment.`;
+
+let blocks = [];
+let currentIndex = 0;
+let scrollPos = 0;
+let playing = false;
+let speed = 1;
+let animFrame = null;
+let lastTime = null;
+let triggeredClips = new Set();
+let currentMedia = null;
+let pdfResumeCallback = null;
+
+function parseScript(text) {
+  return text.split('\n').map(l=>l.trim()).filter(l=>l.length>0).map((line,i) => {
+    const cm = line.match(/^\[CLIP:\s*(.+?)\s*(?:\|\s*(ON|OFF))?\s*(?:\|\s*IN:([\d.]+))?\s*(?:\|\s*OUT:([\d.]+))?\s*\]$/i);
+    const pm = line.match(/^\[PDF:\s*(.+?)\s*\]$/i);
+    if (cm) return { type:'clip', text:cm[1], mode:(cm[2]||'ON').toUpperCase(),
+      cueIn:cm[3]!==undefined?parseFloat(cm[3]):null, cueOut:cm[4]!==undefined?parseFloat(cm[4]):null, index:i };
+    if (pm) return { type:'pdf', text:pm[1], index:i };
+    return { type:'text', text:line, index:i };
+  });
+}
+
+function serializeBlock(b) {
+  if (b.type==='text') return b.text;
+  if (b.type==='pdf')  return `[PDF: ${b.text}]`;
+  let s = `[CLIP: ${b.text} | ${b.mode||'ON'}`;
+  if (b.cueIn  !== null && b.cueIn  !== undefined) s += ` | IN:${b.cueIn.toFixed(2)}`;
+  if (b.cueOut !== null && b.cueOut !== undefined) s += ` | OUT:${b.cueOut.toFixed(2)}`;
+  return s + ']';
+}
+
+// ── RENDERING ─────────────────────────────────────────────
+function markerHTML(block, i) {
+  const ok  = !!fileRegistry[block.text];
+  const pdf = block.type === 'pdf';
+  const aud = !pdf && isAudio(block.text);
+  const cc  = pdf ? 'type-pdf' : 'type-media';
+  const ic  = pdf ? 'pdf-icon' : 'media-icon';
+  const ip  = pdf
+    ? 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM8 17h8v1H8v-1zm0-3h8v1H8v-1zm0-3h5v1H8v-1z'
+    : (aud ? 'M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z' : 'M8 5v14l11-7z');
+  const tl  = pdf ? '📄 pdf' : (aud ? '♪ audio' : '▶ vidéo');
+  const mode = block.mode || 'ON';
+  const hasCue = (block.cueIn!==null&&block.cueIn!==undefined)||(block.cueOut!==null&&block.cueOut!==undefined);
+  const cueLabel = hasCue ? `IN ${fmtTC(block.cueIn)??'0'} → OUT ${fmtTC(block.cueOut)??'fin'}` : 'Aucun cue';
+
+  const controls = (!pdf) ? `
+    <div class="marker-bottom-row">
+      ${!aud ? `<div class="mode-toggle" onclick="event.stopPropagation();toggleClipMode(${i})">
+        <span class="mode-btn ${mode==='ON'?'active':''}" data-mode="ON">⛶ ON SCREEN</span>
+        <span class="mode-btn ${mode==='OFF'?'active':''}" data-mode="OFF">▷ OFF SCREEN</span>
+      </div>` : ''}
+      <div class="cue-info" onclick="event.stopPropagation();openCueEditor(${i})">✂ ${cueLabel}</div>
+    </div>` : '';
+
+  return `<div class="clip-marker ${cc}${ok?'':' no-file'}" data-block="${i}" onclick="manualTriggerClip(${i})">
+    <div class="clip-icon ${ic}"><svg viewBox="0 0 24 24"><path d="${ip}"/></svg></div>
+    <div class="clip-info">
+      <div class="clip-name">${block.text}</div>
+      <div class="clip-sub" id="clip-sub-${i}">${tl} · ${ok?'chargé ✓':'⚠ fichier manquant'}${hasCue?' · ✂ cue':''}</div>
+      ${controls}
+    </div>
+    <div class="clip-status-txt" id="clip-status-${i}">${ok?'en attente':'—'}</div>
+  </div>`;
+}
+
+function renderScript() {
+  document.getElementById('scroll-content').innerHTML = '';
+  blocks.forEach((block,i) => {
+    const div = document.createElement('div');
+    div.className = 'script-block'; div.dataset.index = i;
+    div.innerHTML = (block.type==='clip'||block.type==='pdf') ? markerHTML(block,i) : `<div class="line-text">${block.text}</div>`;
+    document.getElementById('scroll-content').appendChild(div);
+  });
+  refreshClipList();
+}
+
+function refreshClipList() {
+  const ul = document.getElementById('clip-list');
+  ul.innerHTML = '';
+  let n = 0;
+  blocks.forEach((block,i) => {
+    if (block.type!=='clip'&&block.type!=='pdf') return;
+    n++;
+    const ok = !!fileRegistry[block.text];
+    const pdf = block.type==='pdf';
+    const li = document.createElement('li');
+    li.dataset.block = i;
+    li.className = (ok?'':'missing')+(pdf?' pdf-item':'');
+    li.innerHTML = `<div class="clip-dot"></div><span class="clip-n">#${n}</span><span class="clip-ln" title="${block.text}">${block.text}</span><span class="clip-ok ${ok?'yes':'no'}">${ok?'✓':'?'}</span><button class="clip-play-btn" onclick="event.stopPropagation();manualTriggerClip(${i})">▶</button>`;
+    li.onclick = ()=>jumpToBlock(i);
+    ul.appendChild(li);
+    // sync marker
+    const m = document.querySelector(`.clip-marker[data-block="${i}"]`);
+    if (m) {
+      m.classList.toggle('no-file',!ok);
+      const sub = document.getElementById(`clip-sub-${i}`);
+      if (sub) sub.textContent = `${pdf?'📄 pdf':isAudio(block.text)?'♪ audio':'▶ vidéo'} · ${ok?'chargé ✓':'⚠ fichier manquant'}`;
+      const st = document.getElementById(`clip-status-${i}`);
+      if (st && st.textContent==='—' && ok) st.textContent='en attente';
+    }
+  });
+}
+
+// ── PLAYBACK ───────────────────────────────────────────────
+function triggerBlock(idx, onEnded) {
+  const block = blocks[idx];
+  if (!block) return;
+  if (block.type==='pdf')  openPdf(idx, onEnded);
+  else if (block.type==='clip') playClip(idx, onEnded);
+}
+
+function toggleClipMode(idx) {
+  const block = blocks[idx];
+  if (!block||block.type!=='clip') return;
+  block.mode = block.mode==='ON'?'OFF':'ON';
+  const el = getBlockEl(idx);
+  if (el) el.innerHTML = markerHTML(block,idx);
+}
+
+function manualTriggerClip(idx) { triggeredClips.add(idx); triggerBlock(idx,null); }
+
+async function playClip(idx, onEnded) {
+  const block = blocks[idx]; if (!block) return;
+  const entry = fileRegistry[block.text];
+  const statusEl = document.getElementById(`clip-status-${idx}`);
+  if (!entry) { if(statusEl) statusEl.textContent='⚠ manquant'; if(onEnded) onEnded(); return; }
+
+  const audio    = isAudio(block.text);
+  const onScreen = !audio && block.mode !== 'OFF';
+  const markerEl = document.querySelector(`.clip-marker[data-block="${idx}"]`);
+  const nowPlaying = document.getElementById('now-playing');
+
+  if (currentMedia) { currentMedia.pause(); currentMedia = null; }
+  document.querySelectorAll('.clip-marker.is-playing').forEach(el => el.classList.remove('is-playing'));
+
+  if (markerEl) markerEl.classList.add('is-playing');
+  nowPlaying.textContent = '▶ ' + block.text;
+  nowPlaying.classList.add('visible');
+
+  const cueIn  = block.cueIn  || 0;
+  const cueOut = block.cueOut || null;
+
+  function onDone() {
+    hideVideoOverlay();
+    if (markerEl) markerEl.classList.remove('is-playing');
+    if (statusEl) statusEl.textContent = '✓ terminé';
+    if (onEnded) onEnded();
+  }
+
+  const player    = document.getElementById('media-player');
+  const cacheEntry = videoPreloadCache[block.text];
+  const cachedVid  = cacheEntry ? cacheEntry.vid : null;
+
+  if (onScreen) {
+    // ── Wait for preload before showing overlay ──────────────
+    if (cacheEntry && cachedVid.readyState < 4) {
+      if (statusEl) statusEl.textContent = '⏳ chargement…';
+      await cacheEntry.ready;
+    }
+    if (statusEl) statusEl.textContent = '▶ lecture';
+
+    const ov  = document.getElementById('video-overlay');
+    const vid = document.getElementById('overlay-video');
+
+    // Use the buffered src from the preload element — no re-decode
+    vid.src = (cachedVid && cachedVid.readyState >= 3) ? cachedVid.src : entry.dataUrl;
+    vid.muted = false;
+    vid.currentTime = cueIn;
+    ov.classList.add('visible');
+    currentMedia = vid;
+    vid._onDone  = onDone;
+
+    function updateTimer() {
+      const end = (cueOut && isFinite(cueOut)) ? cueOut : vid.duration;
+      if (!isFinite(end)) return;
+      if (vid.currentTime >= end - 0.1) { vid.pause(); onDone(); return; }
+      const rem = end - vid.currentTime;
+      const m = Math.floor(rem/60), s = Math.floor(rem%60);
+      document.getElementById('vt-remaining').textContent = m > 0 ? `${m}:${String(s).padStart(2,'0')}` : `${s}s`;
+      const total = end - cueIn, elapsed = vid.currentTime - cueIn;
+      document.getElementById('vt-bar-fill').style.width = Math.max(0, 100-(elapsed/total*100)) + '%';
+    }
+    vid.ontimeupdate     = updateTimer;
+    vid.onended          = onDone;
+    vid.onloadedmetadata = () => {
+      const end = (cueOut && isFinite(cueOut)) ? cueOut : vid.duration;
+      const total = end - cueIn;
+      const m = Math.floor(total/60), s = Math.floor(total%60);
+      document.getElementById('vt-remaining').textContent = m > 0 ? `${m}:${String(s).padStart(2,'0')}` : `${s}s`;
+      document.getElementById('vt-bar-fill').style.width = '100%';
+    };
+    if (vid.readyState >= 1) vid.onloadedmetadata();
+    vid.play().catch(() => {});
+    player.className = 'empty';
+    player.innerHTML = '<svg viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" d="M8 5v14l11-7z"/></svg><span>Vidéo en cours…</span>';
+
+  } else {
+    // ── OFF SCREEN — PiP ─────────────────────────────────────
+    if (statusEl) statusEl.textContent = '▶ lecture';
+    const pipWrap    = document.getElementById('pip-video-wrap');
+    const pipOverlay = document.getElementById('pip-overlay');
+    document.getElementById('pip-name').textContent = block.text;
+    pipWrap.innerHTML = '';
+
+    let mediaEl;
+    if (!audio && cachedVid && cachedVid.readyState >= 2) {
+      cachedVid.muted = false; cachedVid.controls = true; cachedVid.currentTime = cueIn;
+      cachedVid.style.cssText = 'width:100%;display:block;';
+      pipWrap.appendChild(cachedVid);
+      mediaEl = cachedVid;
+    } else {
+      const tag = audio ? 'audio' : 'video';
+      const el  = document.createElement(tag);
+      el.controls = true; el.src = entry.dataUrl; el.currentTime = cueIn;
+      pipWrap.appendChild(el);
+      mediaEl = el;
+    }
+
+    function pipDone() {
+      mediaEl.pause(); mediaEl.ontimeupdate = null; mediaEl.onended = null;
+      mediaEl.currentTime = cueIn;
+      pipOverlay.classList.remove('visible');
+      if (markerEl) markerEl.classList.remove('is-playing');
+      if (statusEl) statusEl.textContent = '✓ terminé';
+      if (mediaEl === cachedVid) {
+        cachedVid.muted = true; cachedVid.controls = false;
+        cachedVid.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;top:-9999px;';
+        document.body.appendChild(cachedVid);
+      }
+    }
+
+    if (cueOut) mediaEl.ontimeupdate = () => { if (mediaEl.currentTime >= cueOut - 0.1) pipDone(); };
+    mediaEl.onended = pipDone;
+    currentMedia    = mediaEl;
+    pipOverlay.classList.add('visible');
+    mediaEl.play().catch(() => {});
+    if (onEnded) onEnded(); // text continues immediately
+  }
+}
+
+function hideVideoOverlay() {
+  const ov  = document.getElementById('video-overlay');
+  const vid = document.getElementById('overlay-video');
+  ov.classList.remove('visible');
+  vid.pause(); vid.ontimeupdate=null; vid.onloadedmetadata=null; vid.onended=null;
+  vid.currentTime=0; vid.src='';
+  document.getElementById('vt-remaining').textContent='—';
+  document.getElementById('vt-bar-fill').style.width='100%';
+  currentMedia=null;
+}
+
+function skipVideo() {
+  const vid = document.getElementById('overlay-video');
+  const cb = vid._onDone; vid._onDone=null; vid.onended=null; vid.ontimeupdate=null;
+  if (cb) cb();
+}
+
+function closePip() {
+  const pipWrap    = document.getElementById('pip-video-wrap');
+  const pipOverlay = document.getElementById('pip-overlay');
+  Object.values(videoPreloadCache).forEach(entry => {
+    const v = entry && entry.vid ? entry.vid : entry;
+    if (v && v.parentElement && v.parentElement.id === 'pip-video-wrap') {
+      v.pause(); v.currentTime = 0; v.muted = true; v.controls = false;
+      v.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;top:-9999px;';
+      document.body.appendChild(v);
+    }
+  });
+  pipWrap.innerHTML = '';
+  pipOverlay.classList.remove('visible');
+  currentMedia = null;
+}
+
+function openPdf(idx, onEnded) {
+  const block = blocks[idx];
+  const entry = fileRegistry[block.text];
+  const statusEl = document.getElementById(`clip-status-${idx}`);
+  if (!entry) { if(statusEl) statusEl.textContent='⚠ manquant'; if(onEnded) onEnded(); return; }
+  pdfResumeCallback = onEnded||null;
+  document.getElementById('pdf-title').textContent = block.text;
+  document.getElementById('pdf-frame').src = entry.dataUrl;
+  document.getElementById('pdf-overlay').classList.add('visible');
+  if (statusEl) statusEl.textContent='📄 ouvert';
+  const markerEl = document.querySelector(`.clip-marker[data-block="${idx}"]`);
+  if (markerEl) markerEl.classList.add('is-playing');
+  document.getElementById('pdf-overlay').dataset.idx = idx;
+}
+
+function closePdf(andContinue) {
+  const idx = parseInt(document.getElementById('pdf-overlay').dataset.idx||'-1');
+  document.getElementById('pdf-overlay').classList.remove('visible');
+  document.getElementById('pdf-frame').src='';
+  const m = document.querySelector(`.clip-marker[data-block="${idx}"]`);
+  if (m) m.classList.remove('is-playing');
+  const st = document.getElementById(`clip-status-${idx}`);
+  if (st) st.textContent='✓ fermé';
+  if (andContinue && pdfResumeCallback) pdfResumeCallback();
+  pdfResumeCallback=null;
+}
+
+// ── SCROLL ENGINE ─────────────────────────────────────────
+function getBlockEl(i) { return document.querySelector(`.script-block[data-index="${i}"]`); }
+
+function updateActiveBlock() {
+  const wrap = document.getElementById('prompter-wrap');
+  const focusY = wrap.clientHeight/2;
+  let bestIdx=0, bestDist=Infinity;
+  blocks.forEach((_,i) => {
+    const el=getBlockEl(i); if(!el) return;
+    const dist = Math.abs(el.offsetTop+el.offsetHeight/2-scrollPos-focusY);
+    if (dist<bestDist) { bestDist=dist; bestIdx=i; }
+  });
+  if (bestIdx===currentIndex) return;
+  getBlockEl(currentIndex)?.classList.remove('is-active');
+  currentIndex=bestIdx;
+  getBlockEl(currentIndex)?.classList.add('is-active');
+  document.querySelectorAll('.script-block').forEach((el,i)=>el.classList.toggle('is-past',i<currentIndex));
+  const cur = blocks[currentIndex];
+  if ((cur?.type==='clip'||cur?.type==='pdf') && !triggeredClips.has(currentIndex)) {
+    triggeredClips.add(currentIndex);
+    setPlaying(false);
+    triggerBlock(currentIndex, ()=>setPlaying(true));
+  }
+  updateProgress();
+  document.querySelectorAll('#clip-list li').forEach(li=>li.classList.toggle('active',parseInt(li.dataset.block)===currentIndex));
+}
+
+function updateProgress() {
+  const pct = blocks.length>1?Math.round((currentIndex/(blocks.length-1))*100):0;
+  document.getElementById('progress-bar-fill').style.width=pct+'%';
+  document.getElementById('prog-cur').textContent=pct+'%';
+  document.getElementById('prog-blocks').textContent=`${currentIndex+1} / ${blocks.length} blocs`;
+}
+
+function getMaxScroll() {
+  return Math.max(0, document.getElementById('scroll-content').scrollHeight-document.getElementById('prompter-wrap').clientHeight);
+}
+
+function applyScrollPos() {
+  document.getElementById('scroll-content').style.transform=`translateY(-${scrollPos}px)`;
+  updateActiveBlock();
+}
+
+function loop(ts) {
+  if (!playing) return;
+  if (lastTime===null) lastTime=ts;
+  scrollPos += ((ts-lastTime)/1000)*60*speed; lastTime=ts;
+  scrollPos=Math.max(0,Math.min(scrollPos,getMaxScroll()));
+  applyScrollPos();
+  if (scrollPos>=getMaxScroll()) { setPlaying(false); return; }
+  animFrame=requestAnimationFrame(loop);
+}
+
+function setPlaying(val) {
+  playing=val;
+  document.getElementById('play-icon').textContent=playing?'⏸':'▶';
+  document.getElementById('play-label').textContent=playing?'Pause':'Démarrer';
+  document.getElementById('play-btn').classList.toggle('running',playing);
+  if (playing) { lastTime=null; animFrame=requestAnimationFrame(loop); }
+  else if (animFrame) cancelAnimationFrame(animFrame);
+}
+
+function returnToStart() {
+  setPlaying(false);
+  scrollPos = 0;
+  currentIndex = 0;
+  triggeredClips = new Set();
+  applyScrollPos();
+  updateProgress();
+}
+
+function togglePlay() { setPlaying(!playing); }
+
+function scrollStep(dir) {
+  const el=getBlockEl(currentIndex+dir); if(!el) return;
+  const wrap=document.getElementById('prompter-wrap');
+  scrollPos=Math.max(0,Math.min(el.offsetTop+el.offsetHeight/2-wrap.clientHeight/2,getMaxScroll()));
+  applyScrollPos();
+}
+
+function jumpToBlock(i) {
+  const el=getBlockEl(i); if(!el) return;
+  const wrap=document.getElementById('prompter-wrap');
+  scrollPos=Math.max(0,Math.min(el.offsetTop+el.offsetHeight/2-wrap.clientHeight/2,getMaxScroll()));
+  applyScrollPos();
+}
+
+function jumpNextClip() { for(let i=currentIndex+1;i<blocks.length;i++){if(blocks[i].type==='clip'||blocks[i].type==='pdf'){jumpToBlock(i);return;}} }
+function jumpPrevClip() { for(let i=currentIndex-1;i>=0;i--){if(blocks[i].type==='clip'||blocks[i].type==='pdf'){jumpToBlock(i);return;}} }
+function setSpeed(v) { speed=parseFloat(v); document.getElementById('speed-display').textContent=parseFloat(v).toFixed(1)+'×'; }
+function toggleFullscreen() {
+  document.body.classList.toggle('fullscreen');
+  document.getElementById('fullscreen-btn').textContent=document.body.classList.contains('fullscreen')?'⊠ Quitter':'⛶ Plein écran';
+}
+
+// Per-file default mode in the editor panel
+const editorFileModes = {}; // name → 'ON' | 'OFF'
+// Ordered list of file names (for drag reorder)
+let editorFileOrder = [];
+
+function deleteFile(name) {
+  if (!confirm(`Supprimer "${name}" des médias chargés ?`)) return;
+  delete fileRegistry[name];
+  if (videoPreloadCache[name]) {
+    try { videoPreloadCache[name].vid.src = ''; document.body.removeChild(videoPreloadCache[name].vid); } catch(e) {}
+    delete videoPreloadCache[name];
+  }
+  delete editorFileModes[name];
+  editorFileOrder = editorFileOrder.filter(n => n !== name);
+  refreshFilePills(); updateBadge(); refreshClipList();
+  buildEditorFileList();
+}
+
+let efDragSrc = null; // name being reordered
+
+function buildEditorFileList() {
+  const list = document.getElementById('editor-file-list');
+  if (!list) return;
+
+  // Sync order with fileRegistry (add new, remove deleted)
+  const registered = Object.keys(fileRegistry);
+  editorFileOrder = [
+    ...editorFileOrder.filter(n => registered.includes(n)),
+    ...registered.filter(n => !editorFileOrder.includes(n))
+  ];
+
+  list.innerHTML = '';
+  if (!editorFileOrder.length) { list.innerHTML = '<div class="ef-empty">Aucun média chargé.</div>'; return; }
+
+  editorFileOrder.forEach(name => {
+    const pdf = isPdf(name), aud = !pdf && isAudio(name);
+    const icon = pdf ? '📄' : aud ? '♪' : '▶';
+    if (!editorFileModes[name]) editorFileModes[name] = 'ON';
+    const mode = editorFileModes[name];
+
+    const div = document.createElement('div');
+    div.className = 'ef-item' + (pdf ? ' pdf-file' : '');
+    div.dataset.filename = name;
+
+    div.innerHTML = `
+      <span class="ef-icon" style="cursor:grab" title="Glisser pour réordonner">⠿</span>
+      <span class="ef-icon">${icon}</span>
+      <span class="ef-name" title="${name}">${name}</span>
+      <button class="ef-del" onclick="event.stopPropagation();deleteFile('${name.replace(/'/g,"\\'")}')" title="Supprimer">✕</button>
+      ${(!pdf) ? `<div class="ef-mode-row">
+        <span class="ef-mode-btn ${mode==='ON'?'active':''}" data-mode="ON">⛶ ON</span>
+        <span class="ef-mode-btn ${mode==='OFF'?'active':''}" data-mode="OFF">▷ OFF</span>
+      </div>` : ''}`;
+
+    // Mode toggle
+    div.querySelectorAll('.ef-mode-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        editorFileModes[name] = btn.dataset.mode;
+        div.querySelectorAll('.ef-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === btn.dataset.mode));
+      });
+    });
+
+    // ── DRAG TO INSERT INTO TEXTAREA ──────────────────────────
+    div.draggable = true;
+    div.addEventListener('dragstart', e => {
+      efDragSrc = name;
+      const m = editorFileModes[name] || 'ON';
+      // Use JSON so the textarea drop handler knows name + mode
+      e.dataTransfer.setData('text/x-eric-media', JSON.stringify({ name, mode: m }));
+      // Also set plain text as reorder signal
+      e.dataTransfer.setData('text/x-eric-reorder', name);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    div.addEventListener('dragend', () => {
+      efDragSrc = null;
+      list.querySelectorAll('.ef-item').forEach(el => {
+        el.classList.remove('drag-over-top', 'drag-over-bottom');
+      });
+    });
+
+    // ── DRAG TO REORDER ───────────────────────────────────────
+    div.addEventListener('dragover', e => {
+      if (!efDragSrc || efDragSrc === name) return;
+      e.preventDefault(); e.stopPropagation();
+      const rect = div.getBoundingClientRect();
+      const isTop = e.clientY < rect.top + rect.height / 2;
+      div.classList.toggle('drag-over-top', isTop);
+      div.classList.toggle('drag-over-bottom', !isTop);
+    });
+    div.addEventListener('dragleave', () => {
+      div.classList.remove('drag-over-top', 'drag-over-bottom');
+    });
+    div.addEventListener('drop', e => {
+      if (!efDragSrc || efDragSrc === name) return;
+      // Check it's a reorder, not a textarea-bound drop
+      const reorderName = e.dataTransfer.getData('text/x-eric-reorder');
+      if (!reorderName) return;
+      e.preventDefault(); e.stopPropagation();
+      div.classList.remove('drag-over-top', 'drag-over-bottom');
+
+      const rect   = div.getBoundingClientRect();
+      const isTop  = e.clientY < rect.top + rect.height / 2;
+      const fromIdx = editorFileOrder.indexOf(reorderName);
+      let   toIdx   = editorFileOrder.indexOf(name);
+      if (fromIdx === -1 || toIdx === -1) return;
+
+      editorFileOrder.splice(fromIdx, 1);
+      toIdx = editorFileOrder.indexOf(name);
+      editorFileOrder.splice(isTop ? toIdx : toIdx + 1, 0, reorderName);
+      buildEditorFileList();
+    });
+
+    list.appendChild(div);
+  });
+}
+
+function refreshEditorMediaPanel() { buildEditorFileList(); }
+
+function openEditor() {
+  document.getElementById('script-textarea').value = blocks.length
+    ? blocks.map(b=>serializeBlock(b)).join('\n\n')
+    : DEFAULT_SCRIPT;
+  buildEditorFileList();
+  document.getElementById('editor-wrap').classList.add('visible');
+}
+function closeEditor() { document.getElementById('editor-wrap').classList.remove('visible'); }
+function applyScript() { loadScript(document.getElementById('script-textarea').value); closeEditor(); }
+
+function loadScript(text) {
+  setPlaying(false);
+  scrollPos=0; currentIndex=0; triggeredClips=new Set();
+  blocks=parseScript(text);
+  renderScript(); applyScrollPos(); updateProgress();
+  const player=document.getElementById('media-player');
+  player.className='empty';
+  player.innerHTML='<svg viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" d="M8 5v14l11-7z"/></svg><span>Aucun média actif</span>';
+  document.getElementById('now-playing').classList.remove('visible');
+  currentMedia=null;
+}
+
+// ── TEXTAREA DRAG & DROP ─────────────────────────────────
+(function(){
+  const ta=document.getElementById('script-textarea');
+  const hint=document.getElementById('drop-hint');
+
+  ta.addEventListener('dragenter',e=>{e.preventDefault();e.stopPropagation();hint.classList.add('visible');ta.classList.add('drag-active');});
+  ta.addEventListener('dragover', e=>{e.preventDefault();e.stopPropagation();});
+  ta.addEventListener('dragleave',e=>{e.preventDefault();e.stopPropagation();hint.classList.remove('visible');ta.classList.remove('drag-active');});
+
+  ta.addEventListener('drop',e=>{
+    e.preventDefault(); e.stopPropagation();
+    hint.classList.remove('visible'); ta.classList.remove('drag-active');
+
+    // From internal media panel
+    const internalRaw = e.dataTransfer.getData('text/x-eric-media');
+    if (internalRaw) {
+      try {
+        const { name, mode } = JSON.parse(internalRaw);
+        insertMarkers([isPdf(name) ? `[PDF: ${name}]` : `[CLIP: ${name} | ${mode||'ON'}]`]);
+      } catch(err) {
+        // fallback for old format
+        insertMarkers([isPdf(internalRaw) ? `[PDF: ${internalRaw}]` : `[CLIP: ${internalRaw} | ON]`]);
+      }
+      return;
+    }
+    // From OS file system
+    const files=Array.from(e.dataTransfer.files); if(!files.length) return;
+    let done=0; const markers=[];
+    files.forEach(file=>{
+      const reader=new FileReader();
+      reader.onload=ev=>{
+        registerFile(file.name, ev.target.result, file.type);
+        markers.push(isPdf(file.name)?`[PDF: ${file.name}]`:`[CLIP: ${file.name} | ON]`);
+        if(++done===files.length){
+          insertMarkers(markers);
+          refreshFilePills(); buildEditorFileList(); updateBadge();
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+
+  function insertMarkers(tags) {
+    ta.focus();
+    const start=ta.selectionStart, end=ta.selectionEnd, val=ta.value;
+    const before=val.slice(0,start), after=val.slice(end);
+    const nlBefore = before.length>0&&!before.endsWith('\n\n') ? (before.endsWith('\n')?'\n':'\n\n') : '';
+    const nlAfter  = after.length>0&&!after.startsWith('\n') ? '\n\n' : '';
+    const ins = nlBefore+tags.join('\n\n')+nlAfter;
+    ta.value=before+ins+after;
+    ta.selectionStart=ta.selectionEnd=start+ins.length;
+    ta.focus();
+    toast(`✓ ${tags.length} marqueur${tags.length>1?'s':''} inséré${tags.length>1?'s':''}`);
+  }
+})();
+
+// ── CUE EDITOR ────────────────────────────────────────────
+let cueBlockIdx=null, cueVid=null, cueDuration=0, cueInVal=0, cueOutVal=0, cueIsDragging=null;
+
+function openCueEditor(idx) {
+  const block=blocks[idx]; if(!block||block.type==='pdf') return;
+  const entry=fileRegistry[block.text];
+  if (!entry) { toast('⚠ Charge le fichier d\'abord'); return; }
+  cueBlockIdx=idx;
+  document.getElementById('cue-title').textContent=block.text;
+
+  if (cueVid) { cueVid.pause(); cueVid.src=''; cueVid=null; }
+
+  const wrap=document.getElementById('cue-video-wrap');
+  wrap.innerHTML='<div id="cue-timecode">0:00.0</div>';
+
+  const aud=isAudio(block.text);
+  const el=document.createElement(aud?'audio':'video');
+  el.src=entry.dataUrl; el.controls=false;
+  el.style.cssText=aud?'width:100%;display:block;padding:16px;':'width:100%;display:block;max-height:240px;object-fit:contain;';
+  wrap.appendChild(el);
+  cueVid=el;
+
+  cueVid.addEventListener('loadedmetadata',()=>{
+    cueDuration=cueVid.duration;
+    cueInVal  = (block.cueIn!==null&&block.cueIn!==undefined)  ? block.cueIn  : 0;
+    cueOutVal = (block.cueOut!==null&&block.cueOut!==undefined) ? block.cueOut : cueDuration;
+    syncCueSliders(); cueVid.currentTime=cueInVal;
+  });
+  cueVid.addEventListener('timeupdate',()=>{
+    document.getElementById('cue-timecode').textContent=fmtTC(cueVid.currentTime);
+    updatePlayhead(cueVid.currentTime);
+    if (cueVid.currentTime>=cueOutVal-0.08) { cueVid.pause(); cueVid.currentTime=cueOutVal; }
+  });
+  cueVid.addEventListener('play', ()=>{ const b=document.getElementById('cue-play-btn'); if(b) b.textContent='⏸'; });
+  cueVid.addEventListener('pause',()=>{ const b=document.getElementById('cue-play-btn'); if(b) b.textContent='▶'; });
+  cueVid.load();
+
+  setupTimelineDrag();
+  document.getElementById('cue-editor').classList.add('visible');
+}
+
+function closeCueEditor() {
+  document.getElementById('cue-editor').classList.remove('visible');
+  if (cueVid) { cueVid.pause(); cueVid.src=''; cueVid=null; }
+  cueBlockIdx=null;
+}
+
+function updatePlayhead(t) {
+  if (!cueDuration) return;
+  document.getElementById('cue-playhead').style.left=(t/cueDuration*100)+'%';
+}
+
+function syncCueSliders() {
+  const si=document.getElementById('cue-in-slider');
+  const so=document.getElementById('cue-out-slider');
+  si.min=so.min=0; si.max=so.max=cueDuration; si.step=so.step=0.01;
+  si.value=cueInVal; so.value=cueOutVal;
+  document.getElementById('cue-in-val').textContent=fmtTC(cueInVal);
+  document.getElementById('cue-out-val').textContent=fmtTC(cueOutVal);
+  updateRangeFill();
+}
+
+function updateRangeFill() {
+  if (!cueDuration) return;
+  const ip=(cueInVal/cueDuration)*100, op=(cueOutVal/cueDuration)*100;
+  document.getElementById('cue-range-fill').style.left=ip+'%';
+  document.getElementById('cue-range-fill').style.width=(op-ip)+'%';
+  document.getElementById('cue-handle-in').style.left=`calc(${ip}% - 6px)`;
+  document.getElementById('cue-handle-out').style.left=`calc(${op}% - 6px)`;
+}
+
+document.getElementById('cue-in-slider').addEventListener('input',function(){
+  cueInVal=Math.min(parseFloat(this.value),cueOutVal-0.1); this.value=cueInVal;
+  document.getElementById('cue-in-val').textContent=fmtTC(cueInVal); updateRangeFill();
+  if(cueVid) cueVid.currentTime=cueInVal;
+});
+document.getElementById('cue-out-slider').addEventListener('input',function(){
+  cueOutVal=Math.max(parseFloat(this.value),cueInVal+0.1); this.value=cueOutVal;
+  document.getElementById('cue-out-val').textContent=fmtTC(cueOutVal); updateRangeFill();
+  if(cueVid) cueVid.currentTime=cueOutVal;
+});
+
+function setupTimelineDrag() {
+  const tl=document.getElementById('cue-timeline-wrap');
+  const hIn=document.getElementById('cue-handle-in');
+  const hOut=document.getElementById('cue-handle-out');
+  const toTime=cx=>{ const r=tl.getBoundingClientRect(); return Math.max(0,Math.min(1,(cx-r.left)/r.width))*cueDuration; };
+
+  hIn.onmousedown  = e=>{e.preventDefault();cueIsDragging='in';};
+  hOut.onmousedown = e=>{e.preventDefault();cueIsDragging='out';};
+  tl.onmousedown   = e=>{if(e.target===hIn||e.target===hOut)return;cueIsDragging='scrub';if(cueVid)cueVid.currentTime=toTime(e.clientX);};
+
+  document.addEventListener('mousemove',e=>{
+    if (!cueIsDragging) return;
+    const t=toTime(e.clientX);
+    if (cueIsDragging==='in') { cueInVal=Math.max(0,Math.min(t,cueOutVal-0.1)); document.getElementById('cue-in-slider').value=cueInVal; document.getElementById('cue-in-val').textContent=fmtTC(cueInVal); if(cueVid)cueVid.currentTime=cueInVal; }
+    else if (cueIsDragging==='out') { cueOutVal=Math.min(cueDuration,Math.max(t,cueInVal+0.1)); document.getElementById('cue-out-slider').value=cueOutVal; document.getElementById('cue-out-val').textContent=fmtTC(cueOutVal); if(cueVid)cueVid.currentTime=cueOutVal; }
+    else if (cueIsDragging==='scrub') { if(cueVid)cueVid.currentTime=Math.max(0,Math.min(t,cueDuration)); }
+    updateRangeFill();
+  });
+  document.addEventListener('mouseup',()=>{cueIsDragging=null;});
+}
+
+function cueTogglePlay() {
+  if (!cueVid) return;
+  if (cueVid.paused) { if(cueVid.currentTime>=cueOutVal-0.08)cueVid.currentTime=cueInVal; cueVid.play(); }
+  else cueVid.pause();
+}
+function cueStop()        { if(!cueVid)return; cueVid.pause(); cueVid.currentTime=cueInVal; }
+function cueGoStart()     { if(!cueVid)return; cueVid.pause(); cueVid.currentTime=0; }
+function cueGoEnd()       { if(!cueVid)return; cueVid.pause(); cueVid.currentTime=cueDuration; }
+function cueFrameForward(){ if(!cueVid)return; cueVid.pause(); cueVid.currentTime=Math.min(cueDuration,cueVid.currentTime+1/30); }
+function cueFrameBack()   { if(!cueVid)return; cueVid.pause(); cueVid.currentTime=Math.max(0,cueVid.currentTime-1/30); }
+function cuePreviewIn()   { if(!cueVid)return; cueVid.currentTime=Math.max(0,cueInVal-2); cueVid.play(); }
+function cuePreviewOut()  { if(!cueVid)return; cueVid.currentTime=Math.max(cueInVal,cueOutVal-3); cueVid.play(); }
+function cuePreviewFull() { if(!cueVid)return; cueVid.currentTime=cueInVal; cueVid.play(); }
+function cueReset()       { if(!cueDuration)return; cueInVal=0; cueOutVal=cueDuration; syncCueSliders(); if(cueVid)cueVid.currentTime=0; }
+
+function cueApply() {
+  if (cueBlockIdx===null) return;
+  const block=blocks[cueBlockIdx];
+  block.cueIn  = cueInVal<=0.01 ? null : cueInVal;
+  block.cueOut = cueOutVal>=cueDuration-0.05 ? null : cueOutVal;
+  const el=getBlockEl(cueBlockIdx);
+  if (el) el.innerHTML=markerHTML(block,cueBlockIdx);
+  toast(`✂ Cue — IN ${fmtTC(cueInVal)} → OUT ${fmtTC(cueOutVal)}`);
+  closeCueEditor();
+}
+
+// ── KEYBOARD ──────────────────────────────────────────────
+// ── MOUSE WHEEL SCROLL ────────────────────────────────────
+document.getElementById('prompter-wrap').addEventListener('wheel', e => {
+  if (document.getElementById('cue-editor').classList.contains('visible')) return;
+  if (document.getElementById('editor-wrap').classList.contains('visible')) return;
+  e.preventDefault();
+  const wasPlaying = playing;
+  if (playing) setPlaying(false);
+  scrollPos = Math.max(0, Math.min(scrollPos + e.deltaY, getMaxScroll()));
+  applyScrollPos();
+  clearTimeout(document.getElementById('prompter-wrap')._wheelTimer);
+  if (wasPlaying) {
+    document.getElementById('prompter-wrap')._wheelTimer = setTimeout(() => setPlaying(true), 1500);
+  }
+}, { passive: false });
+
+// ── LAST PROJECT (IndexedDB) ──────────────────────────────
+const IDB_NAME = 'lelab-prompter', IDB_STORE = 'handles', IDB_KEY = 'lastDir';
+
+function openIDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore(IDB_STORE);
+    req.onsuccess = e => res(e.target.result);
+    req.onerror   = e => rej(e.target.error);
+  });
+}
+
+async function saveLastDir(handle) {
+  try {
+    const db = await openIDB();
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(handle, IDB_KEY);
+  } catch(e) {}
+}
+
+async function getLastDir() {
+  try {
+    const db = await openIDB();
+    return new Promise((res, rej) => {
+      const tx  = db.transaction(IDB_STORE, 'readonly');
+      const req = tx.objectStore(IDB_STORE).get(IDB_KEY);
+      req.onsuccess = e => res(e.target.result || null);
+      req.onerror   = e => rej(null);
+    });
+  } catch(e) { return null; }
+}
+
+async function tryReopenLastProject() {
+  if (!hasFolderAPI) return; // ZIP mode — no auto-reopen
+  const handle = await getLastDir();
+  if (!handle) return;
+
+  // Show a non-blocking banner asking if they want to reopen
+  const banner = document.createElement('div');
+  banner.id = 'reopen-banner';
+  banner.style.cssText = `
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+    background:#1a1a1a;border:1px solid #3a3a3a;border-radius:10px;
+    padding:14px 20px;display:flex;align-items:center;gap:14px;
+    font-family:'IBM Plex Mono',monospace;font-size:12px;color:#ccc;
+    z-index:999;box-shadow:0 8px 32px rgba(0,0,0,0.6);white-space:nowrap;
+  `;
+  banner.innerHTML = `
+    <span>📂 Reprendre <strong style="color:#00e5a0">"${handle.name}"</strong> ?</span>
+    <button onclick="doReopenLast()" style="background:#00e5a0;color:#000;border:none;border-radius:5px;padding:6px 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;cursor:pointer;">▶ Ouvrir</button>
+    <button onclick="this.parentElement.remove()" style="background:none;border:1px solid #444;border-radius:5px;padding:6px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#888;cursor:pointer;">✕</button>
+  `;
+  document.body.appendChild(banner);
+
+  // Auto-dismiss after 12 seconds
+  setTimeout(() => { if (banner.parentElement) banner.remove(); }, 12000);
+}
+
+async function doReopenLast() {
+  const banner = document.getElementById('reopen-banner');
+  if (banner) banner.remove();
+
+  const handle = await getLastDir();
+  if (!handle) return;
+
+  // Request permission (browser requires user gesture — the button click counts)
+  try {
+    const perm = await handle.requestPermission({ mode: 'read' });
+    if (perm !== 'granted') { toast('⚠ Permission refusée'); return; }
+  } catch(e) { toast('⚠ ' + e.message); return; }
+
+  projectDirHandle = handle;
+  document.getElementById('quick-save-btn').style.display = '';
+  toast(`📂 Chargement de "${handle.name}"…`, 10000);
+
+  try {
+    for await (const [name, fHandle] of handle.entries()) {
+      if (fHandle.kind !== 'file') continue;
+      if (!/\.(mp4|mov|mp3|wav|m4a|pdf)$/i.test(name)) continue;
+      const file = await fHandle.getFile();
+      await new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = e => { registerFile(name, e.target.result, file.type); resolve(); };
+        reader.readAsDataURL(file);
+      });
+    }
+    let scriptText = null;
+    try {
+      const htmlHandle = await handle.getFileHandle('lelab-prompter.html');
+      const htmlFile   = await htmlHandle.getFile();
+      scriptText = extractScriptFromHtml(await htmlFile.text());
+    } catch(e) {}
+    finalizeProjectLoad(scriptText);
+  } catch(err) { toast('⚠ ' + err.message); console.error(err); }
+}
+const FONTS = [
+  { name:'Syne',       family:"'Syne',sans-serif"          },
+  { name:'Inter',      family:"'Inter',sans-serif"          },
+  { name:'Montserrat', family:"'Montserrat',sans-serif"     },
+  { name:'DM Sans',    family:"'DM Sans',sans-serif"        },
+  { name:'Roboto',     family:"'Roboto',sans-serif"         },
+  { name:'Oswald',     family:"'Oswald',sans-serif"         },
+  { name:'Bebas Neue', family:"'Bebas Neue',cursive"        },
+  { name:'Playfair',   family:"'Playfair Display',serif"    },
+  { name:'Courier',    family:"'Courier Prime',monospace"   },
+  { name:'IBM Mono',   family:"'IBM Plex Mono',monospace"   },
+];
+
+let fontPanelSelected = "'Syne',sans-serif";
+let fontPanelSize     = 26;
+let fontPanelSizeFs   = 38;
+
+function buildFontGrid() {
+  const grid = document.getElementById('font-grid');
+  grid.innerHTML = '';
+  FONTS.forEach(f => {
+    const div = document.createElement('div');
+    div.className = 'font-opt' + (f.family === fontPanelSelected ? ' selected' : '');
+    div.innerHTML = `<div class="fo-name" style="font-family:${f.family};font-size:15px">${f.name}</div><div class="fo-sample" style="font-family:${f.family}">Aa Bb 123</div>`;
+    div.onclick = () => {
+      fontPanelSelected = f.family;
+      grid.querySelectorAll('.font-opt').forEach(el => el.classList.remove('selected'));
+      div.classList.add('selected');
+      updateFontPreview();
+    };
+    grid.appendChild(div);
+  });
+}
+
+function updateFontPreview() {
+  const prev = document.getElementById('font-preview');
+  prev.style.fontFamily = fontPanelSelected;
+  prev.style.fontSize   = fontPanelSize + 'px';
+}
+
+function previewFontSize(v) {
+  fontPanelSize = parseInt(v);
+  document.getElementById('font-size-val').textContent = v + 'px';
+  updateFontPreview();
+}
+
+function previewFontSizeFs(v) {
+  fontPanelSizeFs = parseInt(v);
+  document.getElementById('font-size-fs-val').textContent = v + 'px';
+}
+
+function openFontPanel() {
+  try {
+    const saved = localStorage.getItem('llp-font');
+    if (saved) fontPanelSelected = saved;
+    fontPanelSize   = parseInt(localStorage.getItem('llp-size')   || '26');
+    fontPanelSizeFs = parseInt(localStorage.getItem('llp-size-fs')|| '38');
+  } catch(e) {}
+  document.getElementById('font-size-slider').value    = fontPanelSize;
+  document.getElementById('font-size-fs-slider').value = fontPanelSizeFs;
+  document.getElementById('font-size-val').textContent    = fontPanelSize + 'px';
+  document.getElementById('font-size-fs-val').textContent = fontPanelSizeFs + 'px';
+  buildFontGrid();
+  updateFontPreview();
+  document.getElementById('font-panel').classList.add('visible');
+}
+
+function closeFontPanel() {
+  document.getElementById('font-panel').classList.remove('visible');
+}
+
+function applyFont() {
+  const root = document.documentElement.style;
+  root.setProperty('--script-font',    fontPanelSelected);
+  root.setProperty('--script-size',    fontPanelSize + 'px');
+  root.setProperty('--script-size-fs', fontPanelSizeFs + 'px');
+  try {
+    localStorage.setItem('llp-font',    fontPanelSelected);
+    localStorage.setItem('llp-size',    fontPanelSize);
+    localStorage.setItem('llp-size-fs', fontPanelSizeFs);
+  } catch(e) {}
+  closeFontPanel();
+  toast('✓ Police appliquée');
+}
+
+// Restore saved font preferences on load
+(function() {
+  try {
+    const f  = localStorage.getItem('llp-font');
+    const s  = localStorage.getItem('llp-size');
+    const sf = localStorage.getItem('llp-size-fs');
+    if (f)  document.documentElement.style.setProperty('--script-font',    f);
+    if (s)  document.documentElement.style.setProperty('--script-size',    s + 'px');
+    if (sf) document.documentElement.style.setProperty('--script-size-fs', sf + 'px');
+  } catch(e) {}
+})();
+
+// ── INIT ──────────────────────────────────────────────────
+const initScript = window._savedScript || DEFAULT_SCRIPT;
+loadScript(initScript);
+// Offer to reopen last project after a short delay
+setTimeout(tryReopenLastProject, 600);
+
+// ── PWA SERVICE WORKER ────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(r => console.log('SW registered:', r.scope))
+      .catch(e => console.log('SW error:', e));
+  });
+}
+</script>
+</body>
+</html>
