@@ -477,6 +477,10 @@ body.fullscreen{grid-template-columns:1fr}
   <div class="editor-actions">
     <button class="ed-btn primary" onclick="applyScript()">✓ Appliquer</button>
     <button class="ed-btn secondary" onclick="closeEditor()">Annuler</button>
+    <label class="ed-btn secondary" style="cursor:pointer;position:relative;display:inline-flex;align-items:center;gap:6px;">
+      📄 Importer un script
+      <input type="file" accept=".txt,.doc,.docx" onchange="importScriptFile(this)" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;">
+    </label>
   </div>
 </div>
 
@@ -1419,6 +1423,50 @@ function openEditor() {
   buildEditorFileList();
   document.getElementById('editor-wrap').classList.add('visible');
 }
+async function loadMammoth() {
+  if (window.mammoth) return window.mammoth;
+  await new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
+    s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+  return window.mammoth;
+}
+
+async function importScriptFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+  const ta = document.getElementById('script-textarea');
+  const ext = file.name.split('.').pop().toLowerCase();
+  toast('📄 Lecture du fichier…', 5000);
+
+  try {
+    if (ext === 'txt') {
+      // Plain text — read directly
+      const text = await file.text();
+      ta.value = text;
+      toast('✓ Script importé');
+
+    } else if (ext === 'docx' || ext === 'doc') {
+      // Word document — use mammoth to extract plain text
+      const mammoth = await loadMammoth();
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer });
+      if (result.messages.length) console.log('Mammoth warnings:', result.messages);
+      ta.value = result.value;
+      toast('✓ Script Word importé');
+
+    } else {
+      toast('⚠ Format non supporté — utilise .txt, .doc ou .docx');
+    }
+  } catch(err) {
+    toast('⚠ Erreur : ' + err.message);
+    console.error(err);
+  }
+}
+
 function closeEditor() { document.getElementById('editor-wrap').classList.remove('visible'); }
 function applyScript() { loadScript(document.getElementById('script-textarea').value); closeEditor(); }
 
